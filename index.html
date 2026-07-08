@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>星紡ぎ -HOSHITSUMUGI-</title>
+<style>
+:root{
+  --sky-0:#070b1e; --sky-1:#0d1230; --sky-2:#171a3f;
+  --panel:#141a36; --panel-2:#1b2246;
+  --ink:#eef0f8; --ink-dim:#9aa1c4; --ink-faint:#5b628a;
+  --gold:#e9c46a; --gold-hi:#f6dfa4; --gold-dark:#a8842f;
+  --line:rgba(233,196,106,.22);
+  --danger:#ff7a7a;
+  --radius:14px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;background:var(--sky-0);color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  min-height:100%; touch-action:manipulation;}
+body{background:
+  radial-gradient(1200px 800px at 80% -10%, #22194d 0%, transparent 55%),
+  radial-gradient(1000px 700px at -10% 110%, #0e2140 0%, transparent 55%),
+  linear-gradient(175deg, var(--sky-1), var(--sky-0) 70%);
+  background-attachment:fixed;}
+.serif{font-family:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho","MS PMincho",serif;}
+#app{max-width:560px;margin:0 auto;padding:14px 14px calc(24px + env(safe-area-inset-bottom));min-height:100vh;position:relative;}
+.starfield{position:fixed;inset:0;pointer-events:none;z-index:0;}
+.starfield svg{width:100%;height:100%;}
+.tw{animation:tw 3.4s ease-in-out infinite;}
+@keyframes tw{0%,100%{opacity:.25}50%{opacity:.95}}
+@media (prefers-reduced-motion: reduce){ .tw,.pulse,.flare{animation:none !important;} }
+.stack{position:relative;z-index:1;}
+h1.title{font-size:44px;letter-spacing:.14em;text-align:center;margin:36px 0 4px;
+  background:linear-gradient(160deg,var(--gold-hi),var(--gold) 55%,var(--gold-dark));
+  -webkit-background-clip:text;background-clip:text;color:transparent;font-weight:600;}
+.subtitle{text-align:center;color:var(--ink-dim);letter-spacing:.5em;font-size:12px;margin-bottom:6px;padding-left:.5em;}
+.tagline{text-align:center;color:var(--ink-faint);font-size:12px;margin-bottom:28px;line-height:1.9;}
+.card{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);
+  border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:0 6px 24px rgba(0,0,0,.35);}
+.card h2{font-size:15px;margin:0 0 12px;color:var(--gold);letter-spacing:.2em;font-weight:600;}
+label.f{display:block;font-size:12px;color:var(--ink-dim);margin:10px 0 5px;letter-spacing:.1em;}
+input[type=text]{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);
+  background:#0c102a;color:var(--ink);font-size:16px;letter-spacing:.08em;outline:none;}
+input[type=text]:focus{border-color:var(--gold);}
+.btn{display:block;width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);
+  background:linear-gradient(180deg,#232a58,#181e42);color:var(--ink);font-size:15px;
+  letter-spacing:.12em;cursor:pointer;margin-top:10px;transition:transform .06s, box-shadow .2s;}
+.btn:active{transform:scale(.985);}
+.btn.gold{background:linear-gradient(180deg,#f2d48f,#d9a944);color:#241a05;border-color:#f6dfa4;font-weight:700;
+  box-shadow:0 4px 18px rgba(233,196,106,.28);}
+.btn.ghost{background:transparent;}
+.btn:disabled{opacity:.38;pointer-events:none;}
+.btn.small{padding:9px 12px;font-size:13px;margin-top:0;width:auto;display:inline-block;}
+.row{display:flex;gap:8px;}
+.row .btn{margin-top:0;}
+.seg{display:flex;gap:8px;margin-top:4px;}
+.seg button{flex:1;padding:11px 0;border-radius:10px;border:1px solid var(--line);background:#0c102a;color:var(--ink-dim);font-size:15px;cursor:pointer;}
+.seg button.on{background:linear-gradient(180deg,#2b3468,#1d2450);color:var(--gold-hi);border-color:var(--gold);}
+.code-big{font-size:40px;text-align:center;letter-spacing:.35em;color:var(--gold-hi);margin:8px 0 2px;padding-left:.35em;}
+.hint{font-size:12px;color:var(--ink-faint);text-align:center;line-height:1.8;}
+.plist{margin:10px 0 4px;}
+.pitem{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#0c102a;
+  border:1px solid var(--line);margin-bottom:8px;font-size:14px;}
+.pmark{width:22px;height:22px;flex:none;}
+.pitem .who{flex:1;}
+.pitem .tag{font-size:11px;color:var(--ink-faint);}
+.pitem.me{border-color:var(--gold);}
+.toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);background:#241a05;color:var(--gold-hi);
+  border:1px solid var(--gold);padding:10px 18px;border-radius:99px;font-size:13px;z-index:60;opacity:0;
+  pointer-events:none;transition:opacity .25s;max-width:86%;text-align:center;}
+.toast.show{opacity:1;}
+/* ===== ゲーム画面 ===== */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.topbar .t{font-size:17px;letter-spacing:.22em;color:var(--gold);}
+.topbar .r{font-size:12px;color:var(--ink-dim);}
+.fate{border:1px solid var(--line);border-left:3px solid var(--gold);background:linear-gradient(90deg,rgba(233,196,106,.10),transparent 70%);
+  border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:10px;line-height:1.6;}
+.fate b{color:var(--gold-hi);}
+.turnbanner{text-align:center;font-size:14px;letter-spacing:.18em;padding:9px;border-radius:10px;margin-bottom:10px;
+  background:#0c102a;border:1px solid var(--line);color:var(--ink-dim);}
+.turnbanner.mine{background:linear-gradient(180deg,#3a2f10,#241d08);border-color:var(--gold);color:var(--gold-hi);}
+.pulse{animation:pulse 1.6s ease-in-out infinite;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(233,196,106,.0)}50%{box-shadow:0 0 18px 2px rgba(233,196,106,.35)}}
+.boardwrap{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:
+  radial-gradient(600px 400px at 70% 10%, rgba(70,60,140,.25), transparent 60%),
+  linear-gradient(180deg,#0a0e26,#0d1230);margin-bottom:10px;position:relative;}
+.boardwrap svg{display:block;width:100%;height:auto;}
+.node{cursor:pointer;}
+.node.dead{opacity:.12;pointer-events:none;}
+.node .halo{transition:opacity .3s;}
+.consline{stroke:rgba(160,170,220,.20);stroke-width:1.4;fill:none;}
+.consline.done{stroke:url(#goldline);stroke-width:2.2;filter:drop-shadow(0 0 4px rgba(233,196,106,.6));}
+.consname{font-size:13px;fill:rgba(170,178,215,.55);letter-spacing:2px;
+  font-family:"Shippori Mincho","Hiragino Mincho ProN",serif;}
+.consname.done{fill:var(--gold-hi);}
+.flare{animation:flare 2.2s ease-in-out infinite;}
+@keyframes flare{0%,100%{opacity:.5}50%{opacity:1}}
+/* プレイヤー帯 */
+.pstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:7px;margin-bottom:10px;}
+.pchip{background:#0c102a;border:1px solid var(--line);border-radius:10px;padding:7px 9px;font-size:11px;color:var(--ink-dim);}
+.pchip .nm{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:12px;margin-bottom:3px;}
+.pchip .nm svg{width:14px;height:14px;flex:none;}
+.pchip.turn{border-color:var(--gold);background:linear-gradient(180deg,#1e1c10,#12132e);}
+/* 手札 */
+.handzone{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);
+  border-radius:var(--radius);padding:12px;margin-bottom:10px;}
+.handzone .hd{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink-dim);margin-bottom:9px;letter-spacing:.1em;}
+.hand{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{width:46px;height:62px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;border:1px solid rgba(255,255,255,.16);font-size:12px;position:relative;cursor:default;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15), 0 3px 8px rgba(0,0,0,.4);}
+.chip .k{font-size:19px;font-family:"Shippori Mincho",serif;font-weight:700;}
+.chip.sel{outline:2px solid var(--gold-hi);transform:translateY(-4px);}
+.chip.pickable{cursor:pointer;}
+.actions{display:flex;gap:8px;}
+.actions .btn{margin-top:0;font-size:13px;padding:12px 4px;letter-spacing:.06em;}
+.ap{display:inline-block;min-width:20px;text-align:center;background:var(--gold);color:#241a05;border-radius:99px;
+  font-weight:700;font-size:12px;padding:1px 7px;margin-left:6px;}
+.log{font-size:11px;color:var(--ink-faint);line-height:1.9;max-height:110px;overflow-y:auto;
+  border-top:1px dashed var(--line);padding-top:8px;margin-top:10px;}
+.log b{color:var(--ink-dim);font-weight:600;}
+/* モーダル */
+.modal-bg{position:fixed;inset:0;background:rgba(4,6,18,.78);z-index:50;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(3px);}
+.modal{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--gold);
+  border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));width:100%;max-width:560px;max-height:82vh;overflow-y:auto;}
+.modal h3{margin:0 0 12px;font-size:15px;color:var(--gold);letter-spacing:.15em;}
+.modal .desc{font-size:13px;color:var(--ink-dim);line-height:1.8;margin-bottom:12px;}
+.opt{display:block;width:100%;text-align:left;padding:13px 14px;margin-bottom:8px;border-radius:11px;
+  border:1px solid var(--line);background:#0c102a;color:var(--ink);font-size:14px;cursor:pointer;}
+.opt:active{background:#161c3e;}
+.opt .sub{display:block;font-size:11px;color:var(--ink-faint);margin-top:3px;}
+.opt:disabled{opacity:.35;}
+.rules{font-size:13px;line-height:2;color:var(--ink-dim);}
+.rules h4{color:var(--gold);margin:16px 0 6px;font-size:13px;letter-spacing:.15em;}
+.rules b{color:var(--ink);}
+/* 結果 */
+.result-rank{display:flex;align-items:center;gap:10px;padding:13px;border-radius:12px;background:#0c102a;
+  border:1px solid var(--line);margin-bottom:9px;}
+.result-rank.win{border-color:var(--gold);background:linear-gradient(180deg,#2a230d,#141530);}
+.result-rank .pos{font-size:22px;width:34px;text-align:center;color:var(--gold);font-family:"Shippori Mincho",serif;}
+.result-rank .body{flex:1;}
+.result-rank .nm{font-size:15px;display:flex;gap:7px;align-items:center;}
+.result-rank .bd{font-size:11px;color:var(--ink-faint);margin-top:3px;line-height:1.7;}
+.result-rank .total{font-size:24px;color:var(--gold-hi);font-family:"Shippori Mincho",serif;}
+.objcard{border:1px dashed var(--gold);border-radius:10px;padding:10px 12px;font-size:13px;background:rgba(233,196,106,.06);
+  margin-bottom:10px;line-height:1.7;}
+.objcard .h{font-size:11px;color:var(--gold);letter-spacing:.2em;margin-bottom:2px;}
+.linklike{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-size:12px;cursor:pointer;padding:6px;}
+.center{text-align:center;}
+</style>
+</head>
+<body>
+<div class="starfield" id="starfield"></div>
+<div id="app" class="stack"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================
+   星紡ぎ -HOSHITSUMUGI-  オリジナル通信対戦ゲーム
+   共有ストレージ(window.storage, shared=true)で
+   ルームコードによるスマホ間同期を行う。
+===================================================== */
+
+// ---------- 定数データ ----------
+const COLORS = {
+  R:{name:'紅', hex:'#e85566', deep:'#7a1f2b'},
+  B:{name:'蒼', hex:'#4f8ef7', deep:'#1c3a7a'},
+  G:{name:'翠', hex:'#3ec98f', deep:'#155c40'},
+  Y:{name:'金', hex:'#f0c05a', deep:'#6e5312'},
+  P:{name:'紫', hex:'#a97ef2', deep:'#452073'},
+  W:{name:'虹', hex:'#f2f4ff', deep:'#555d88'},
+};
+const PSTYLE = [
+  {name:'茜', hex:'#ff7eb6', shape:'circle'},
+  {name:'空', hex:'#59d0ff', shape:'triangle'},
+  {name:'若葉', hex:'#8ef58a', shape:'square'},
+  {name:'橙', hex:'#ffb35c', shape:'diamond'},
+];
+// 星座定義: nodes = [x, y, 色, 価値]
+const CONS = [
+  {name:'白帆', bonus:8, edges:[[0,1],[1,2],[2,3],[3,4],[4,0]], label:[520,28],
+   nodes:[[430,90,'B',2],[520,60,'Y',1],[610,110,'B',1],[560,190,'P',2],[460,180,'R',1]]},
+  {name:'氷狐', bonus:8, edges:[[0,1],[1,2],[2,3],[3,0]], label:[178,40],
+   nodes:[[120,120,'B',1],[210,90,'P',2],[260,180,'B',3],[160,230,'G',1]]},
+  {name:'紫琴', bonus:8, edges:[[0,1],[1,2],[2,3],[3,0]], label:[850,52],
+   nodes:[[780,90,'P',1],[870,130,'P',3],[900,230,'R',1],[800,210,'B',2]]},
+  {name:'黄金梯', bonus:8, edges:[[0,1],[1,2],[2,3],[3,4],[4,0]], label:[520,255],
+   nodes:[[420,330,'Y',2],[520,300,'Y',1],[620,340,'G',2],[560,430,'Y',3],[460,440,'R',1]]},
+  {name:'紅鯨', bonus:8, edges:[[0,1],[1,2],[2,3],[3,4],[4,0]], label:[178,330],
+   nodes:[[90,420,'R',2],[180,380,'R',1],[280,420,'G',1],[240,520,'R',3],[130,540,'B',1]]},
+  {name:'翠蛇', bonus:8, edges:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0]], label:[830,300],
+   nodes:[[760,340,'G',1],[860,380,'G',2],[920,470,'P',1],[860,560,'G',3],[760,600,'Y',1],[700,500,'R',2]]},
+  {name:'双眼', bonus:8, edges:[[0,1],[1,2],[2,3],[3,0],[1,3]], label:[470,525],
+   nodes:[[380,600,'B',2],[470,570,'G',1],[560,610,'P',2],[470,680,'Y',1]]},
+  {name:'灯籠', bonus:8, edges:[[0,1],[1,2],[2,3],[3,0]], label:[240,615],
+   nodes:[[180,680,'Y',2],[270,650,'P',1],[300,750,'R',2],[200,780,'G',1]]},
+];
+// 全ノードをフラット化
+const NODES = [];
+CONS.forEach((c,ci)=>c.nodes.forEach((n,li)=>NODES.push({id:NODES.length,x:n[0],y:n[1],c:n[2],v:n[3],cons:ci,li})));
+
+const FATES = [
+  {id:'bless',  name:'恵み',   desc:'追加で1枚引く', w:5},
+  {id:'bless2', name:'豊穣',   desc:'追加で2枚引く', w:3},
+  {id:'calm',   name:'静寂',   desc:'何も起こらない', w:5},
+  {id:'meteor', name:'流星',   desc:'このターン、1回だけ<b>無料</b>で点灯できる', w:3},
+  {id:'eclipse',name:'月蝕',   desc:'このターン中、<b>任意の欠片1枚</b>でどの星も点灯できる', w:3},
+  {id:'wind',   name:'追い風', desc:'このターンの行動力が<b>3</b>になる', w:3},
+];
+
+// ---------- ローカル状態 ----------
+let me = {id: rid(), name:''};
+let roomCode = null;
+let st = null;            // 共有ゲーム状態
+let screen = 'title';     // title | join | wait | game | rules
+let ui = {payNode:null, picker:null, showObj:false, exchange:false};
+let pollTimer = null;
+let starCache = null;
+
+function rid(){ return Math.random().toString(36).slice(2,10); }
+function key(code){ return 'hoshi_room_' + code; }
+function $(s){ return document.querySelector(s); }
+function esc(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove('show'),2300); }
+
+// ---------- 通信(共有ストレージ) ----------
+async function saveState(s){
+  s.v = (s.v||0)+1;
+  try{
+    await window.storage.set(key(roomCode), JSON.stringify(s), true);
+    st = s; render();
+  }catch(e){ toast('通信に失敗しました。もう一度お試しください'); }
+}
+async function loadState(code){
+  try{
+    const r = await window.storage.get(key(code), true);
+    return r && r.value ? JSON.parse(r.value) : null;
+  }catch(e){ return null; }
+}
+function startPolling(){
+  stopPolling();
+  pollTimer = setInterval(async ()=>{
+    if(!roomCode) return;
+    const s = await loadState(roomCode);
+    if(s && (!st || s.v > st.v)){
+      st = s;
+      if(st.phase==='playing' && screen!=='game') screen='game';
+      if(st.phase==='ended') screen='game';
+      render();
+    }
+  }, 2000);
+}
+function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+
+// ---------- ゲームロジック ----------
+function buildDeck(){
+  const d=[];
+  for(const c of ['R','B','G','Y','P']) for(let i=0;i<16;i++) d.push(c);
+  for(let i=0;i<8;i++) d.push('W');
+  return shuffle(d);
+}
+function activeConsFor(n){
+  if(n<=2) return [0,2,3,4,5,6];       // 氷狐・灯籠を除外(29星)
+  if(n===3) return [0,1,2,3,4,5,6];    // 灯籠を除外(33星)
+  return [0,1,2,3,4,5,6,7];            // 全37星
+}
+function buildObjectives(active){
+  const pool=[];
+  for(const c of ['R','B','G','Y','P'])
+    pool.push({type:'color', c, pts:6, text:`${COLORS[c].name}色の星を4つ以上灯す(+6点)`});
+  for(const ci of [3,5,4]) if(active.includes(ci))
+    pool.push({type:'cons', ci, pts:5, text:`星座『${CONS[ci].name}』で単独最多の星を灯す(+5点)`});
+  return shuffle(pool);
+}
+function rollFate(){
+  const total = FATES.reduce((s,f)=>s+f.w,0);
+  let r = Math.random()*total;
+  for(const f of FATES){ if((r-=f.w)<0) return f.id; }
+  return 'calm';
+}
+function drawCards(s, pIdx, n){
+  const p = s.players[pIdx];
+  let drawn=0;
+  for(let i=0;i<n;i++){
+    if(p.hand.length>=8) break;
+    if(s.deck.length===0){
+      if(s.discard.length===0) break;
+      s.deck = shuffle(s.discard.slice()); s.discard=[];
+      pushLog(s, '捨て札を混ぜ直し、星屑の山が甦った');
+    }
+    p.hand.push(s.deck.pop()); drawn++;
+  }
+  return drawn;
+}
+function pushLog(s, msg){ s.log.unshift(msg); if(s.log.length>10) s.log.length=10; }
+function beginTurn(s){
+  const f = rollFate();
+  s.fate = f;
+  s.ap = f==='wind' ? 3 : 2;
+  s.meteorAvail = f==='meteor';
+  s.eclipse = f==='eclipse';
+  const extra = f==='bless'?1 : f==='bless2'?2 : 0;
+  const p = s.players[s.turn];
+  const got = drawCards(s, s.turn, 2+extra);
+  const fd = FATES.find(x=>x.id===f);
+  pushLog(s, `<b>${esc(p.name)}</b> の番。星運は「${fd.name}」。欠片を${got}枚引いた`);
+}
+function startGame(s){
+  const n = s.players.length;
+  s.activeCons = activeConsFor(n);
+  s.deck = buildDeck(); s.discard=[];
+  s.nodes = {};
+  const objs = buildObjectives(s.activeCons);
+  s.players.forEach(p=>{ p.hand=[]; p.objective = objs.pop(); });
+  s.players.forEach((_,i)=>drawCards(s,i,5));
+  s.turn = 0; s.round = 1; s.maxRounds = 12;
+  s.log = []; s.phase = 'playing';
+  pushLog(s, `星紡ぎ、開幕。${n}人で${s.activeCons.length}の星座を巡る`);
+  beginTurn(s);
+}
+function activeNodeIds(s){ return NODES.filter(nd=>s.activeCons.includes(nd.cons)).map(nd=>nd.id); }
+function consComplete(s, ci){ return CONS[ci].nodes.every((_,li)=>{
+  const nd = NODES.find(n=>n.cons===ci && n.li===li);
+  return s.nodes[nd.id]!==undefined;
+});}
+function afterPlacement(s, node){
+  const ci = node.cons;
+  if(consComplete(s, ci)) pushLog(s, `★ 星座『${CONS[ci].name}』が完成した！`);
+  const all = activeNodeIds(s).every(id=>s.nodes[id]!==undefined);
+  if(all){ finishGame(s, 'すべての星が灯った'); return true; }
+  return false;
+}
+function advanceTurn(s){
+  s.turn = (s.turn+1) % s.players.length;
+  if(s.turn===0){
+    s.round++;
+    if(s.round > s.maxRounds){ finishGame(s, `${s.maxRounds}巡が過ぎ、夜が明けた`); return; }
+  }
+  beginTurn(s);
+}
+function finishGame(s, reason){
+  s.phase='ended'; s.endReason=reason;
+  s.results = s.players.map((p,pi)=>{
+    const owned = NODES.filter(nd=>s.nodes[nd.id]===pi && s.activeCons.includes(nd.cons));
+    const nodePts = owned.reduce((a,nd)=>a+nd.v,0);
+    let consB = 0; const consWon=[];
+    for(const ci of s.activeCons){
+      if(!consComplete(s,ci)) continue;
+      const counts = s.players.map((_,qi)=>NODES.filter(nd=>nd.cons===ci && s.nodes[nd.id]===qi).length);
+      const mx = Math.max(...counts);
+      if(counts[pi]===mx && mx>0){
+        const winners = counts.filter(c=>c===mx).length;
+        const b = winners===1 ? CONS[ci].bonus : 4;
+        consB += b; consWon.push(CONS[ci].name);
+      }
+    }
+    let objPts = 0, objOk=false;
+    const o = p.objective;
+    if(o.type==='color'){ objOk = owned.filter(nd=>nd.c===o.c).length>=4; }
+    else { // 単独最多
+      const counts = s.players.map((_,qi)=>NODES.filter(nd=>nd.cons===o.ci && s.nodes[nd.id]===qi).length);
+      const mine = counts[pi];
+      objOk = mine>0 && counts.every((c,qi)=>qi===pi || c<mine);
+    }
+    if(objOk) objPts = o.pts;
+    return {pi, nodePts, consB, consWon, objOk, objPts, total: nodePts+consB+objPts};
+  }).sort((a,b)=>b.total-a.total);
+  pushLog(s, `終幕 ── ${reason}`);
+}
+
+// ---------- 操作(自分の番のみ) ----------
+function isMyTurn(){
+  if(!st || st.phase!=='playing') return false;
+  return st.players[st.turn] && st.players[st.turn].id===me.id;
+}
+function myIdx(){ return st ? st.players.findIndex(p=>p.id===me.id) : -1; }
+
+async function doLight(nodeId, method, cards){
+  const s = JSON.parse(JSON.stringify(st));
+  if(s.players[s.turn].id!==me.id || s.ap<=0) return;
+  const node = NODES[nodeId];
+  if(s.nodes[nodeId]!==undefined || !s.activeCons.includes(node.cons)) return;
+  const p = s.players[s.turn];
+  const removeOne = (c)=>{ const i=p.hand.indexOf(c); if(i<0) return false; p.hand.splice(i,1); s.discard.push(c); return true; };
+  let costTxt='';
+  if(method==='meteor'){
+    if(!s.meteorAvail) return; s.meteorAvail=false; costTxt='流星の力(無料)';
+  }else if(method==='eclipse'){
+    if(!s.eclipse) return; if(!removeOne(cards[0])) return; costTxt=`月蝕(${COLORS[cards[0]].name}×1)`;
+  }else if(method==='match'){
+    const use = p.hand.includes(node.c) ? node.c : 'W';
+    if(!removeOne(use)) return; costTxt=`${COLORS[use].name}×1`;
+  }else if(method==='any2'){
+    if(cards.length!==2) return;
+    const copy = p.hand.slice();
+    for(const c of cards){ const i=copy.indexOf(c); if(i<0) return; copy.splice(i,1); }
+    removeOne(cards[0]); removeOne(cards[1]);
+    costTxt=`${COLORS[cards[0]].name}+${COLORS[cards[1]].name}`;
+  }else return;
+  s.nodes[nodeId] = s.turn;
+  s.ap--;
+  pushLog(s, `<b>${esc(p.name)}</b> が『${CONS[node.cons].name}』の${COLORS[node.c].name}星(★${node.v})を灯した〔${costTxt}〕`);
+  ui.payNode=null; ui.picker=null;
+  const ended = afterPlacement(s, node);
+  if(!ended && s.ap===0) pushLog(s, `${esc(p.name)} の行動力が尽きた`);
+  await saveState(s);
+}
+async function doExchange(card){
+  const s = JSON.parse(JSON.stringify(st));
+  if(s.players[s.turn].id!==me.id || s.ap<=0) return;
+  const p = s.players[s.turn];
+  const i = p.hand.indexOf(card); if(i<0) return;
+  p.hand.splice(i,1); s.discard.push(card);
+  const got = drawCards(s, s.turn, 2);
+  s.ap--;
+  pushLog(s, `<b>${esc(p.name)}</b> が${COLORS[card].name}の欠片を星に還し、${got}枚を得た`);
+  ui.picker=null; ui.exchange=false;
+  await saveState(s);
+}
+async function doEndTurn(){
+  const s = JSON.parse(JSON.stringify(st));
+  if(s.players[s.turn].id!==me.id) return;
+  pushLog(s, `<b>${esc(s.players[s.turn].name)}</b> が番を終えた`);
+  advanceTurn(s);
+  await saveState(s);
+}
+
+// ---------- ルーム作成・参加 ----------
+function genCode(){
+  const cs='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let c='';
+  for(let i=0;i<4;i++) c+=cs[Math.floor(Math.random()*cs.length)];
+  return c;
+}
+async function createRoom(capacity){
+  const name = ($('#nameInput')?.value||'').trim() || '名無しの星詠み';
+  me.name = name;
+  roomCode = genCode();
+  const s = {
+    v:0, code:roomCode, phase:'lobby', capacity,
+    hostId: me.id,
+    players:[{id:me.id, name, hand:[], objective:null}],
+    log:[],
+  };
+  await saveState(s);
+  screen='wait'; startPolling(); render();
+}
+async function joinRoom(){
+  const code = ($('#codeInput')?.value||'').trim().toUpperCase();
+  const name = ($('#nameInput2')?.value||'').trim() || '名無しの星詠み';
+  if(code.length!==4){ toast('4文字のコードを入力してください'); return; }
+  const s = await loadState(code);
+  if(!s){ toast('その部屋は見つかりません'); return; }
+  roomCode = code; me.name = name;
+  // 復帰: 同名プレイヤーがいれば引き継ぎ
+  const existing = s.players.find(p=>p.name===name);
+  if(existing){
+    me.id = existing.id;
+    st = s; screen = s.phase==='lobby' ? 'wait' : 'game';
+    startPolling(); render();
+    toast('この名前で復帰しました');
+    return;
+  }
+  if(s.phase!=='lobby'){ toast('この部屋はすでに開始しています(同じ名前なら復帰できます)'); return; }
+  if(s.players.length >= s.capacity){ toast('満員です'); return; }
+  let nm = name, k=2;
+  while(s.players.some(p=>p.name===nm)) nm = name+k++;
+  me.name = nm;
+  s.players.push({id:me.id, name:nm, hand:[], objective:null});
+  await saveState(s);
+  screen='wait'; startPolling(); render();
+}
+async function hostStart(){
+  const s = JSON.parse(JSON.stringify(st));
+  if(s.hostId!==me.id || s.players.length<2) return;
+  startGame(s);
+  screen='game';
+  await saveState(s);
+}
+
+// ---------- 描画 ----------
+function markerSVG(shape, hex, size){
+  const s=size||16, h=s/2;
+  if(shape==='circle')   return `<svg viewBox="0 0 20 20" width="${s}" height="${s}"><circle cx="10" cy="10" r="7" fill="${hex}"/></svg>`;
+  if(shape==='triangle') return `<svg viewBox="0 0 20 20" width="${s}" height="${s}"><polygon points="10,3 18,17 2,17" fill="${hex}"/></svg>`;
+  if(shape==='square')   return `<svg viewBox="0 0 20 20" width="${s}" height="${s}"><rect x="4" y="4" width="12" height="12" rx="2" fill="${hex}"/></svg>`;
+  return `<svg viewBox="0 0 20 20" width="${s}" height="${s}"><polygon points="10,2 18,10 10,18 2,10" fill="${hex}"/></svg>`;
+}
+function markerPath(shape, cx, cy, r, hex){
+  if(shape==='circle')   return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${hex}"/>`;
+  if(shape==='triangle') return `<polygon points="${cx},${cy-r} ${cx+r*0.9},${cy+r*0.75} ${cx-r*0.9},${cy+r*0.75}" fill="${hex}"/>`;
+  if(shape==='square')   return `<rect x="${cx-r*0.8}" y="${cy-r*0.8}" width="${r*1.6}" height="${r*1.6}" rx="1.5" fill="${hex}"/>`;
+  return `<polygon points="${cx},${cy-r} ${cx+r},${cy} ${cx},${cy+r} ${cx-r},${cy}" fill="${hex}"/>`;
+}
+function starfieldSVG(){
+  if(starCache) return starCache;
+  let dots='';
+  for(let i=0;i<130;i++){
+    const x=Math.random()*100, y=Math.random()*100, r=Math.random()*1.1+0.2, d=(Math.random()*3).toFixed(1);
+    dots += `<circle class="tw" cx="${x}%" cy="${y}%" r="${r}" fill="#cfd6ff" style="animation-delay:-${d}s"/>`;
+  }
+  starCache = `<svg>${dots}</svg>`;
+  return starCache;
+}
+function boardSVG(){
+  const s = st;
+  let defs = `<defs><linearGradient id="goldline" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#f6dfa4"/><stop offset="1" stop-color="#c99a3a"/></linearGradient>`;
+  for(const k of ['R','B','G','Y','P']){
+    defs += `<radialGradient id="g${k}"><stop offset="0" stop-color="${COLORS[k].hex}"/><stop offset="70%" stop-color="${COLORS[k].deep}"/><stop offset="100%" stop-color="#0a0e26"/></radialGradient>`;
+  }
+  defs += '</defs>';
+  let lines='', labels='', nodes='';
+  CONS.forEach((c,ci)=>{
+    const dead = !s.activeCons.includes(ci);
+    const done = !dead && consComplete(s,ci);
+    for(const [a,b] of c.edges){
+      const na=c.nodes[a], nb=c.nodes[b];
+      lines += `<line class="consline ${done?'done':''}" x1="${na[0]}" y1="${na[1]}" x2="${nb[0]}" y2="${nb[1]}" ${dead?'opacity="0.06"':''}/>`;
+    }
+    labels += `<text class="consname ${done?'done flare':''}" x="${c.label[0]}" y="${c.label[1]}" text-anchor="middle" ${dead?'opacity="0.1"':''}>${c.name}</text>`;
+  });
+  NODES.forEach(nd=>{
+    const dead = !s.activeCons.includes(nd.cons);
+    const owner = s.nodes[nd.id];
+    const r = 13 + nd.v*3;
+    let g = `<g class="node ${dead?'dead':''}" data-node="${nd.id}">`;
+    g += `<circle class="halo" cx="${nd.x}" cy="${nd.y}" r="${r+9}" fill="${COLORS[nd.c].hex}" opacity="${owner!==undefined?0.10:0.16}"/>`;
+    g += `<circle cx="${nd.x}" cy="${nd.y}" r="${r}" fill="url(#g${nd.c})" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
+    g += `<text x="${nd.x}" y="${nd.y+4.5}" text-anchor="middle" font-size="13" fill="#fff" font-weight="700" style="pointer-events:none">${nd.v}</text>`;
+    if(owner!==undefined){
+      const ps = PSTYLE[owner];
+      g += `<circle cx="${nd.x}" cy="${nd.y}" r="${r+4}" fill="none" stroke="${ps.hex}" stroke-width="3"/>`;
+      g += markerPath(ps.shape, nd.x + r*0.85, nd.y - r*0.85, 6.5, ps.hex);
+    }
+    g += '</g>';
+    nodes += g;
+  });
+  return `<svg viewBox="0 0 1000 830" xmlns="http://www.w3.org/2000/svg">${defs}${lines}${labels}${nodes}</svg>`;
+}
+function chipHTML(c, i, cls){
+  const col = COLORS[c];
+  const bg = c==='W'
+    ? 'background:conic-gradient(from 200deg,#e85566,#f0c05a,#3ec98f,#4f8ef7,#a97ef2,#e85566);color:#141a36;'
+    : `background:linear-gradient(165deg,${col.hex},${col.deep});color:#fff;`;
+  return `<div class="chip ${cls||''}" data-card="${c}" data-i="${i}" style="${bg}">
+    <span class="k">${col.name}</span><span style="font-size:10px;opacity:.85">${c==='W'?'万能':'欠片'}</span></div>`;
+}
+
+function render(){
+  $('#starfield').innerHTML = starfieldSVG();
+  const app = $('#app');
+  if(screen==='title'){ app.innerHTML = viewTitle(); bindTitle(); return; }
+  if(screen==='join'){ app.innerHTML = viewJoin(); bindJoin(); return; }
+  if(screen==='rules'){ app.innerHTML = viewRules(); bindRules(); return; }
+  if(screen==='wait'){ app.innerHTML = viewWait(); bindWait(); return; }
+  if(screen==='game'){
+    app.innerHTML = st.phase==='ended' ? viewResult() : viewGame();
+    st.phase==='ended' ? bindResult() : bindGame();
+    return;
+  }
+}
+
+// ---------- 各画面 ----------
+function viewTitle(){
+  return `
+  <div class="subtitle serif">二 〜 四 人 ・ 星 座 争 奪 戦</div>
+  <h1 class="title serif">星紡ぎ</h1>
+  <div class="tagline">夜空に散らばる三十七の星。<br>欠片を集め、星を灯し、星座の覇者となれ。</div>
+  <div class="card">
+    <h2>部屋を作る</h2>
+    <label class="f">あなたの名前</label>
+    <input type="text" id="nameInput" maxlength="8" placeholder="星詠みの名">
+    <label class="f">人数(あとから来る人を待ちます)</label>
+    <div class="seg" id="capSeg">
+      <button data-c="2">2人</button><button data-c="3">3人</button><button data-c="4" class="on">4人</button>
+    </div>
+    <button class="btn gold" id="btnCreate">部屋を作って合言葉を発行</button>
+  </div>
+  <div class="card">
+    <h2>部屋に入る</h2>
+    <button class="btn" id="btnGoJoin">合言葉を入力して参加</button>
+  </div>
+  <div class="center"><button class="linklike" id="btnRules">▶ 遊び方を読む(約2分)</button></div>`;
+}
+function bindTitle(){
+  $('#capSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    $('#capSeg').querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+  });
+  $('#btnCreate').onclick = ()=>{
+    const cap = +$('#capSeg .on').dataset.c;
+    createRoom(cap);
+  };
+  $('#btnGoJoin').onclick = ()=>{ screen='join'; render(); };
+  $('#btnRules').onclick = ()=>{ screen='rules'; render(); };
+}
+function viewJoin(){
+  return `
+  <h1 class="title serif" style="font-size:30px;margin-top:24px;">星紡ぎ</h1>
+  <div class="card">
+    <h2>部屋に入る</h2>
+    <label class="f">合言葉(4文字)</label>
+    <input type="text" id="codeInput" maxlength="4" placeholder="例: K7RM" style="text-transform:uppercase;letter-spacing:.3em;text-align:center;font-size:22px;">
+    <label class="f">あなたの名前(中断から戻るときは同じ名前で)</label>
+    <input type="text" id="nameInput2" maxlength="8" placeholder="星詠みの名">
+    <button class="btn gold" id="btnJoin">入室する</button>
+    <button class="btn ghost" id="btnBack">もどる</button>
+  </div>`;
+}
+function bindJoin(){
+  $('#btnJoin').onclick = joinRoom;
+  $('#btnBack').onclick = ()=>{ screen='title'; render(); };
+}
+function viewWait(){
+  const isHost = st.hostId===me.id;
+  const full = st.players.length >= st.capacity;
+  return `
+  <h1 class="title serif" style="font-size:28px;margin-top:20px;">待合の間</h1>
+  <div class="card center">
+    <h2>合言葉</h2>
+    <div class="code-big serif">${st.code}</div>
+    <div class="hint">同じアプリを開いた仲間に、この4文字を伝えてください。<br>「部屋に入る」から入室できます。</div>
+  </div>
+  <div class="card">
+    <h2>集った星詠み(${st.players.length} / ${st.capacity})</h2>
+    <div class="plist">
+      ${st.players.map((p,i)=>`
+        <div class="pitem ${p.id===me.id?'me':''}">
+          <span class="pmark">${markerSVG(PSTYLE[i].shape, PSTYLE[i].hex, 22)}</span>
+          <span class="who">${esc(p.name)}${p.id===st.hostId?' <span class="tag">(部屋主)</span>':''}</span>
+          ${p.id===me.id?'<span class="tag">あなた</span>':''}
+        </div>`).join('')}
+    </div>
+    ${isHost
+      ? `<button class="btn gold" id="btnStart" ${st.players.length<2?'disabled':''}>
+           ${full?'全員そろった — 開始する':`この${st.players.length}人で開始する`}</button>
+         <div class="hint" style="margin-top:8px">2人なら約40分、4人なら約90分の星巡りです</div>`
+      : `<div class="hint">部屋主の開始を待っています…</div>`}
+  </div>
+  <div class="center"><button class="linklike" id="btnRules">▶ 待っている間に遊び方を読む</button></div>`;
+}
+function bindWait(){
+  const b=$('#btnStart'); if(b) b.onclick=hostStart;
+  $('#btnRules').onclick=()=>{ screen='rules'; render(); };
+}
+function viewRules(){
+  return `
+  <h1 class="title serif" style="font-size:26px;margin-top:18px;">遊び方</h1>
+  <div class="card rules">
+    <h4>■ 勝利条件</h4>
+    夜空の星をより多く・より賢く灯し、<b>最終得点がいちばん高い人</b>が勝ちます。
+    <h4>■ 星と星座</h4>
+    盤上には色と価値(★1〜3)を持つ星が並び、いくつかの星をまとめて<b>星座</b>を成しています。
+    人数によって使う星座の数が変わります(2人:6星座 / 3人:7星座 / 4人:8星座)。
+    <h4>■ 手番の流れ</h4>
+    ① 手番の頭に<b>星運</b>が巡り(運の要素)、欠片を2枚引きます。<br>
+    ② <b>行動力2</b>(星運「追い風」なら3)を使って行動します。<br>
+    &nbsp;&nbsp;・<b>点灯</b>: 星と同じ色の欠片1枚(虹は万能)、または任意の欠片2枚を支払い、その星に自分の印を灯す<br>
+    &nbsp;&nbsp;・<b>還元</b>: 欠片1枚を捨てて2枚引く<br>
+    ③ 「番を終える」で次の人へ。
+    <h4>■ 星運(毎ターン変わる運命)</h4>
+    恵み(+1枚) / 豊穣(+2枚) / 静寂 / <b>流星</b>(1回無料で点灯) / <b>月蝕</b>(任意1枚でどの星でも点灯) / <b>追い風</b>(行動力3)
+    <h4>■ 得点</h4>
+    ・灯した星の★の合計<br>
+    ・<b>完成した星座</b>ごとに、その星座で最多の星を灯した人に+8点(同数なら各+4点)<br>
+    ・各自に配られる<b>秘密の目標</b>(達成で+5〜6点)。他人には見えません。
+    <h4>■ 終了</h4>
+    すべての星が灯るか、12巡が過ぎたら終了。得点計算に移ります。
+    <h4>■ こつ</h4>
+    手札(運)と相談しつつ、星座の<b>過半数</b>を狙うのが定石。ただし相手の秘密の目標を読み、
+    要所を先に灯して<b>妨害</b>するのも立派な戦略です。
+  </div>
+  <button class="btn" id="btnBack">もどる</button>`;
+}
+function bindRules(){
+  $('#btnBack').onclick=()=>{ screen = roomCode ? (st && st.phase!=='lobby' ? 'game':'wait') : 'title'; render(); };
+}
+
+function viewGame(){
+  const s = st;
+  const cur = s.players[s.turn];
+  const mine = isMyTurn();
+  const mi = myIdx();
+  const meP = mi>=0 ? s.players[mi] : null;
+  const fd = FATES.find(f=>f.id===s.fate);
+  const spectating = mi<0;
+  return `
+  <div class="topbar">
+    <div class="t serif">星紡ぎ</div>
+    <div class="r">第${s.round}巡 / 全${s.maxRounds}巡 &nbsp; 部屋 ${s.code}</div>
+  </div>
+  <div class="fate">今宵の星運 <b>「${fd.name}」</b> ── ${fd.desc}</div>
+  <div class="turnbanner ${mine?'mine pulse':''}">
+    ${mine ? `あなたの番です <span class="ap">行動力 ${s.ap}</span>` : `${esc(cur.name)} の番 <span style="opacity:.6">(残り行動力${s.ap})</span>`}
+  </div>
+  <div class="pstrip">
+    ${s.players.map((p,i)=>{
+      const owned = NODES.filter(nd=>s.nodes[nd.id]===i);
+      const pts = owned.reduce((a,nd)=>a+nd.v,0);
+      return `<div class="pchip ${i===s.turn?'turn':''}">
+        <div class="nm">${markerSVG(PSTYLE[i].shape,PSTYLE[i].hex,14)} ${esc(p.name)}</div>
+        星${owned.length} ・ ★${pts} ・ 手札${p.hand.length}
+      </div>`;}).join('')}
+  </div>
+  <div class="boardwrap" id="board">${boardSVG()}</div>
+  ${spectating ? '<div class="hint">観戦中です</div>' : `
+  <div class="handzone">
+    <div class="hd">
+      <span>あなたの欠片(${meP.hand.length}/8)</span>
+      <button class="linklike" id="btnObj" style="padding:0">秘密の目標を${ui.showObj?'隠す':'見る'}</button>
+    </div>
+    ${ui.showObj ? `<div class="objcard"><div class="h">SECRET ── あなただけの目標</div>${esc(meP.objective.text)}</div>`:''}
+    <div class="hand">${meP.hand.map((c,i)=>chipHTML(c,i)).join('') || '<span class="hint">欠片がありません</span>'}</div>
+    ${mine ? `
+    <div class="actions" style="margin-top:12px">
+      <button class="btn" id="btnExchange" ${s.ap<=0||meP.hand.length===0?'disabled':''}>還元<br><span style="font-size:10px;opacity:.7">1枚捨て2枚引く</span></button>
+      <button class="btn gold" id="btnEnd">番を終える</button>
+    </div>
+    <div class="hint" style="margin-top:9px">点灯するには、盤上の灯したい星をタップ</div>
+    `:''}
+  </div>`}
+  <div class="card" style="padding:12px 14px 6px">
+    <div class="log">${s.log.map(l=>'・'+l).join('<br>')}</div>
+    <div class="center"><button class="linklike" id="btnRules2">遊び方</button></div>
+  </div>
+  ${ui.payNode!==null ? viewPayModal() : ''}
+  ${ui.picker ? viewPickerModal() : ''}`;
+}
+function viewPayModal(){
+  const s=st, nd=NODES[ui.payNode];
+  const meP = s.players[myIdx()];
+  const hand = meP.hand;
+  const exact = hand.filter(c=>c===nd.c).length;
+  const prism = hand.filter(c=>c==='W').length;
+  const opts=[];
+  if(s.meteorAvail) opts.push({m:'meteor', t:'流星の力で灯す', sub:'無料(このターン1回きり)'});
+  if(s.eclipse && hand.length>=1) opts.push({m:'eclipse', t:'月蝕の力で灯す', sub:'好きな欠片1枚を選んで支払う'});
+  if(exact>0) opts.push({m:'match', t:`${COLORS[nd.c].name}の欠片 ×1 を支払う`, sub:'同色払い'});
+  else if(prism>0) opts.push({m:'match', t:'虹の欠片 ×1 を支払う', sub:'万能払い'});
+  if(hand.length>=2) opts.push({m:'any2', t:'任意の欠片 ×2 を支払う', sub:'色が合わないときの代替払い'});
+  return `
+  <div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>『${CONS[nd.cons].name}』の ${COLORS[nd.c].name}星(★${nd.v}) を灯す</h3>
+    <div class="desc">支払い方法を選んでください。</div>
+    ${opts.length ? opts.map(o=>`<button class="opt" data-m="${o.m}">${o.t}<span class="sub">${o.sub}</span></button>`).join('')
+      : '<div class="desc">支払える欠片がありません。「還元」で手札を入れ替えましょう。</div>'}
+    <button class="btn ghost" id="modalClose">やめる</button>
+  </div></div>`;
+}
+function viewPickerModal(){
+  const pk = ui.picker;
+  const meP = st.players[myIdx()];
+  const selCount = pk.sel.length;
+  return `
+  <div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>${pk.title}</h3>
+    <div class="desc">${pk.desc}(選択中 ${selCount}/${pk.need})</div>
+    <div class="hand">${meP.hand.map((c,i)=>chipHTML(c,i, 'pickable'+(pk.sel.includes(i)?' sel':''))).join('')}</div>
+    <button class="btn gold" id="pickerOk" ${selCount!==pk.need?'disabled':''} style="margin-top:14px">決定</button>
+    <button class="btn ghost" id="modalClose">やめる</button>
+  </div></div>`;
+}
+function bindGame(){
+  const b=$('#board');
+  if(b) b.querySelectorAll('.node').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = +el.dataset.node;
+      if(!isMyTurn()){ toast('あなたの番ではありません'); return; }
+      if(st.ap<=0){ toast('行動力が残っていません。番を終えましょう'); return; }
+      if(st.nodes[id]!==undefined){ toast('その星はすでに灯っています'); return; }
+      ui.payNode=id; render();
+    });
+  });
+  const bo=$('#btnObj'); if(bo) bo.onclick=()=>{ ui.showObj=!ui.showObj; render(); };
+  const be=$('#btnExchange'); if(be) be.onclick=()=>{
+    ui.picker={need:1, sel:[], title:'還元 ── 星に還す欠片を選ぶ', desc:'1枚捨てて、山から2枚引きます。', mode:'exchange'};
+    render();
+  };
+  const bt=$('#btnEnd'); if(bt) bt.onclick=doEndTurn;
+  const br=$('#btnRules2'); if(br) br.onclick=()=>{ screen='rules'; render(); };
+  const mc=$('#modalClose'); if(mc) mc.onclick=()=>{ ui.payNode=null; ui.picker=null; render(); };
+  const bg=$('#modalBg'); if(bg) bg.addEventListener('click',e=>{ if(e.target===bg){ ui.payNode=null; ui.picker=null; render(); }});
+  // 支払い選択
+  document.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{
+    const m=o.dataset.m, nid=ui.payNode;
+    if(m==='match'||m==='meteor'){ doLight(nid, m, []); return; }
+    if(m==='eclipse'){
+      ui.picker={need:1, sel:[], title:'月蝕 ── 支払う欠片を1枚選ぶ', desc:'どの色でも構いません。', mode:'eclipse', nid};
+      render(); return;
+    }
+    if(m==='any2'){
+      ui.picker={need:2, sel:[], title:'代替払い ── 欠片を2枚選ぶ', desc:'任意の2枚を支払って点灯します。', mode:'any2', nid};
+      render(); return;
+    }
+  });
+  // ピッカー
+  if(ui.picker){
+    document.querySelectorAll('.chip.pickable').forEach(ch=>ch.onclick=()=>{
+      const i=+ch.dataset.i, pk=ui.picker;
+      const at=pk.sel.indexOf(i);
+      if(at>=0) pk.sel.splice(at,1);
+      else if(pk.sel.length<pk.need) pk.sel.push(i);
+      render();
+    });
+    const ok=$('#pickerOk'); if(ok) ok.onclick=()=>{
+      const pk=ui.picker, meP=st.players[myIdx()];
+      const cards = pk.sel.map(i=>meP.hand[i]);
+      if(pk.mode==='exchange') doExchange(cards[0]);
+      else if(pk.mode==='eclipse') doLight(pk.nid,'eclipse',cards);
+      else if(pk.mode==='any2') doLight(pk.nid,'any2',cards);
+    };
+  }
+}
+function viewResult(){
+  const s=st;
+  const top = s.results[0].total;
+  return `
+  <h1 class="title serif" style="font-size:30px;margin-top:18px;">終幕</h1>
+  <div class="hint" style="margin-bottom:14px">${esc(s.endReason)}</div>
+  <div class="card">
+    <h2>星巡りの結果</h2>
+    ${s.results.map((r,rank)=>{
+      const p=s.players[r.pi], ps=PSTYLE[r.pi];
+      return `<div class="result-rank ${r.total===top?'win':''}">
+        <div class="pos serif">${rank+1}</div>
+        <div class="body">
+          <div class="nm">${markerSVG(ps.shape,ps.hex,15)} ${esc(p.name)}</div>
+          <div class="bd">星の輝き ${r.nodePts}点
+            ${r.consB?` ／ 星座の覇権 +${r.consB}点(${r.consWon.join('・')})`:''}
+            ${r.objOk?` ／ 秘密の目標 達成 +${r.objPts}点`:' ／ 秘密の目標 未達'}<br>
+            <span style="opacity:.7">目標:「${esc(p.objective.text)}」</span>
+          </div>
+        </div>
+        <div class="total">${r.total}</div>
+      </div>`;}).join('')}
+  </div>
+  <div class="boardwrap">${boardSVG()}</div>
+  <div class="hint" style="margin:12px 0">もう一局は、部屋主が新しい部屋を作って合言葉を共有してください。</div>
+  <button class="btn" id="btnTitle">最初の画面へ</button>`;
+}
+function bindResult(){
+  $('#btnTitle').onclick=()=>{
+    stopPolling(); roomCode=null; st=null; screen='title';
+    me = {id: rid(), name: me.name};
+    render();
+  };
+}
+
+render();
+</script>
+</body>
+</html>
