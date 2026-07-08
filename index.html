@@ -134,6 +134,22 @@ input[type=text]:focus{border-color:var(--gold);}
 .rules{font-size:13px;line-height:2;color:var(--ink-dim);}
 .rules h4{color:var(--gold);margin:16px 0 6px;font-size:13px;letter-spacing:.15em;}
 .rules b{color:var(--ink);}
+/* 星占の儀 */
+.scardrow{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:20px 0;}
+.scard{width:72px;height:104px;border-radius:11px;border:1.5px solid var(--gold);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(233,196,106,.16) 0 8px, transparent 9px),
+    repeating-linear-gradient(135deg,#1d2450 0 7px,#161c3f 7px 14px);
+  color:var(--gold);box-shadow:0 5px 14px rgba(0,0,0,.45), inset 0 0 0 3px rgba(233,196,106,.12);}
+.scard .em{font-family:"Shippori Mincho",serif;font-size:24px;opacity:.55;}
+.scard.tappable{cursor:pointer;}
+.scard.tappable:active{transform:scale(.94);}
+.scard.revealed{background:linear-gradient(165deg,#f6dfa4,#d9a944);color:#241a05;border-color:#fff0cd;}
+.scard.revealed .big{font-size:24px;font-weight:700;font-family:"Shippori Mincho",serif;}
+.scard.revealed .sub{font-size:10px;font-weight:600;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sndbtn{background:none;border:1px solid var(--line);border-radius:99px;color:var(--gold);
+  font-size:15px;padding:4px 11px;cursor:pointer;}
 /* 結果 */
 .result-rank{display:flex;align-items:center;gap:10px;padding:13px;border-radius:12px;background:#0c102a;
   border:1px solid var(--line);margin-bottom:9px;}
@@ -247,9 +263,11 @@ function netCleanup(){
   peer=null; hostConns=[]; hostConn=null; isHost=false;
 }
 function adoptState(s){
+  fxCheck(s);
   st = s;
-  if(st.phase==='playing' && screen!=='game') screen='game';
+  if((st.phase==='playing'||st.phase==='setup') && screen!=='game') screen='game';
   if(st.phase==='ended') screen='game';
+  syncBGM();
   render();
 }
 async function saveState(s){
@@ -283,6 +301,76 @@ function hostMsg(conn, m){
     if(m.st && m.st.v > st.v){ adoptState(m.st); broadcast({type:'state', st:m.st}); }
   }
 }
+
+// ---------- サウンド(Web Audio内蔵合成 / 外部ファイル不要) ----------
+let AC=null, master=null, soundOn=true, bgmTimers=[], padStep=0, seenCompleted=null, prevPhase=null;
+function nfreq(name){
+  const m=name.match(/^([A-G])(#?)(\d)$/);
+  const base={C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]]+(m[2]?1:0);
+  return 440*Math.pow(2,(((+m[3]+1)*12+base)-69)/12);
+}
+function ensureAudio(){
+  const Ctx=window.AudioContext||window.webkitAudioContext;
+  if(!Ctx) return;
+  if(!AC){ AC=new Ctx(); master=AC.createGain(); master.gain.value=1; master.connect(AC.destination); }
+  if(AC.state==='suspended') AC.resume();
+}
+function tone(name,o){
+  if(!AC||!soundOn) return;
+  o=o||{};
+  const t=AC.currentTime+(o.time||0), dur=o.dur||1;
+  const osc=AC.createOscillator(); osc.type=o.type||'sine'; osc.frequency.value=nfreq(name);
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(o.vol||.05, t+(o.attack||.02));
+  g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+  let out=g;
+  if(o.pan && AC.createStereoPanner){ const p=AC.createStereoPanner(); p.pan.value=o.pan; g.connect(p); out=p; }
+  osc.connect(g); out.connect(master);
+  osc.start(t); osc.stop(t+dur+.15);
+}
+// 和風ペンタトニック(D-E-G-A-B)のアンビエントBGM
+const PADS=[['D3','A3','E4'],['B2','F#3','D4'],['G2','D3','A3'],['A2','E3','B3']];
+const PLUCKS=['D5','E5','G5','A5','B5','D6'];
+function startBGM(){
+  if(bgmTimers.length || !soundOn) return;
+  ensureAudio(); if(!AC) return;
+  const pad=()=>{ const ch=PADS[padStep++ % PADS.length];
+    ch.forEach(n=>tone(n,{dur:9.5,type:'sine',vol:.027,attack:2.8})); };
+  pad();
+  bgmTimers.push(setInterval(pad, 8000));
+  bgmTimers.push(setInterval(()=>{
+    if(Math.random()<.55) tone(PLUCKS[Math.floor(Math.random()*PLUCKS.length)],
+      {dur:2.2,type:'triangle',vol:.038,attack:.012,pan:Math.random()*1.2-.6});
+  }, 1400));
+}
+function stopBGM(){ bgmTimers.forEach(clearInterval); bgmTimers=[]; }
+function syncBGM(){
+  if(st && (st.phase==='playing'||st.phase==='setup') && soundOn) startBGM(); else stopBGM();
+}
+function sfxComplete(){ // 星座完成の煌めき
+  ensureAudio(); if(!AC||!soundOn) return;
+  ['D5','G5','A5','D6','F#6'].forEach((n,i)=>tone(n,{time:i*.09,dur:1.3,type:'sine',vol:.09}));
+  tone('D6',{time:.45,dur:2.6,type:'sine',vol:.045});
+  tone('A6',{time:.55,dur:2.2,type:'sine',vol:.025});
+}
+function sfxFinale(){ // 終幕の和音
+  ensureAudio(); if(!AC||!soundOn) return;
+  [['D4','A4','D5'],['G4','B4','E5'],['D4','A4','F#5','D6']].forEach((ch,i)=>
+    ch.forEach(n=>tone(n,{time:i*.7,dur:i===2?3.5:1.2,type:'sine',vol:.06})));
+}
+function sfxPick(){ ensureAudio(); if(!AC||!soundOn)return; tone('A5',{dur:.5,type:'triangle',vol:.06}); tone('D6',{time:.06,dur:.7,type:'triangle',vol:.05}); }
+function toggleSound(){ soundOn=!soundOn; if(soundOn){ensureAudio(); syncBGM();} else stopBGM(); render(); }
+function fxCheck(s){ // 状態更新に伴う効果音(全端末で鳴る)
+  if((s.phase==='playing'||s.phase==='ended') && s.activeCons){
+    const comp = s.activeCons.filter(ci=>consComplete(s,ci));
+    if(seenCompleted===null){ seenCompleted=new Set(comp); }
+    else comp.forEach(ci=>{ if(!seenCompleted.has(ci)){ seenCompleted.add(ci); sfxComplete(); } });
+  }
+  if(prevPhase!=='ended' && s.phase==='ended'){ stopBGM(); sfxFinale(); }
+  prevPhase=s.phase;
+}
+document.addEventListener('pointerdown', ()=>{ ensureAudio(); syncBGM(); });
 
 // ---------- ゲームロジック ----------
 function buildDeck(){
@@ -337,17 +425,33 @@ function beginTurn(s){
   const fd = FATES.find(x=>x.id===f);
   pushLog(s, `<b>${esc(p.name)}</b> の番。星運は「${fd.name}」。欠片を${got}枚引いた`);
 }
-function startGame(s){
+function drawHandCards(){ // 始まりの手札: 1枚15% / 2枚30% / 3枚35% / 4枚20%
+  const w=[[1,15],[2,30],[3,35],[4,20]];
+  const pick=()=>{ let r=Math.random()*100; for(const [v,p] of w){ if((r-=p)<0) return v; } return 3; };
+  return [pick(),pick(),pick(),pick()];
+}
+function beginSetup(s){
   const n = s.players.length;
   s.activeCons = activeConsFor(n);
-  s.deck = buildDeck(); s.discard=[];
-  s.nodes = {};
+  s.deck = buildDeck(); s.discard=[]; s.nodes={};
   const objs = buildObjectives(s.activeCons);
-  s.players.forEach(p=>{ p.hand=[]; p.objective = objs.pop(); });
-  s.players.forEach((_,i)=>drawCards(s,i,5));
-  s.turn = 0; s.round = 1; s.maxRounds = 12;
-  s.log = []; s.phase = 'playing';
-  pushLog(s, `星紡ぎ、開幕。${n}人で${s.activeCons.length}の星座を巡る`);
+  s.players.forEach(p=>{ p.hand=[]; p.objective=objs.pop(); p.startHand=null; p.order=null; });
+  s.log = []; s.phase='setup';
+  s.setup = {
+    step:'hand', idx:0, last:null,
+    handCards: s.players.map(()=>drawHandCards()),
+    orderCards: shuffle(Array.from({length:n},(_,i)=>i+1)),
+    orderPicked: Array(n).fill(null),
+  };
+  pushLog(s, `星占の儀、始まる ── ${n}人で${s.activeCons.length}の星座を巡る`);
+  pushLog(s, '一の儀: 伏せられた四枚の星札から一枚を選び、始まりの手札を占う');
+}
+function finalizeSetup(s){
+  s.players.sort((a,b)=>a.order-b.order);
+  s.players.forEach((p,i)=>drawCards(s, i, p.startHand));
+  s.turn=0; s.round=1; s.maxRounds=12;
+  s.phase='playing';
+  pushLog(s, `廻り順 定まる ── ${s.players.map(p=>esc(p.name)).join(' → ')}`);
   beginTurn(s);
 }
 function activeNodeIds(s){ return NODES.filter(nd=>s.activeCons.includes(nd.cons)).map(nd=>nd.id); }
@@ -457,6 +561,44 @@ async function doEndTurn(){
   await saveState(s);
 }
 
+function isMySetup(){
+  return st && st.phase==='setup' && st.players[st.setup.idx] && st.players[st.setup.idx].id===me.id;
+}
+const KNUM=['一','二','三','四'];
+async function doPickHand(cardIdx){
+  const s = JSON.parse(JSON.stringify(st));
+  if(s.phase!=='setup' || s.setup.step!=='hand') return;
+  if(s.players[s.setup.idx].id!==me.id) return;
+  const v = s.setup.handCards[s.setup.idx][cardIdx];
+  s.players[s.setup.idx].startHand = v;
+  const nm = esc(s.players[s.setup.idx].name);
+  s.setup.last = `${nm} の始まりの欠片は <b>${v}枚</b>`;
+  pushLog(s, `<b>${nm}</b> が星札をめくった ── 始まりの欠片は${v}枚`);
+  s.setup.idx++;
+  if(s.setup.idx >= s.players.length){
+    s.setup.step='order'; s.setup.idx=0;
+    pushLog(s, '二の儀: 親から順に星札を引き、廻り順を占う');
+  }
+  sfxPick();
+  await saveState(s);
+}
+async function doPickOrder(slotIdx){
+  const s = JSON.parse(JSON.stringify(st));
+  if(s.phase!=='setup' || s.setup.step!=='order') return;
+  if(s.players[s.setup.idx].id!==me.id) return;
+  if(s.setup.orderPicked[slotIdx]!==null) return;
+  const pos = s.setup.orderCards[slotIdx];
+  s.setup.orderPicked[slotIdx] = s.setup.idx;
+  s.players[s.setup.idx].order = pos;
+  const nm = esc(s.players[s.setup.idx].name);
+  s.setup.last = `${nm} は「<b>${KNUM[pos-1]}番星</b>」を引いた ── ${pos}番手`;
+  pushLog(s, `<b>${nm}</b> は「${KNUM[pos-1]}番星」を引いた`);
+  s.setup.idx++;
+  sfxPick();
+  if(s.setup.idx >= s.players.length) finalizeSetup(s);
+  await saveState(s);
+}
+
 // ---------- ルーム作成・参加 ----------
 function genCode(){
   const cs='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let c='';
@@ -473,7 +615,7 @@ function createRoom(capacity){
 function tryCreate(capacity, attempt){
   if(attempt>=3){ toast('部屋を作れませんでした。通信環境を確認して再度お試しください'); return; }
   const code = genCode();
-  netCleanup(); isHost = true;
+  netCleanup(); isHost = true; seenCompleted=null; prevPhase=null;
   peer = new Peer(PFX+code, PEER_OPTS);
   let opened = false;
   peer.on('open', ()=>{
@@ -498,7 +640,7 @@ function joinRoom(){
   const name = ($('#nameInput2')?.value||'').trim() || '名無しの星詠み';
   if(code.length!==4){ toast('4文字の合言葉を入力してください'); return; }
   me.name = name;
-  netCleanup(); isHost = false;
+  netCleanup(); isHost = false; seenCompleted=null; prevPhase=null;
   toast('部屋を探しています…');
   peer = new Peer(PEER_OPTS);
   peer.on('open', ()=>{
@@ -524,7 +666,7 @@ function joinRoom(){
 async function hostStart(){
   const s = JSON.parse(JSON.stringify(st));
   if(s.hostId!==me.id || s.players.length<2) return;
-  startGame(s);
+  beginSetup(s);
   screen='game';
   await saveState(s);
 }
@@ -606,8 +748,9 @@ function render(){
   if(screen==='rules'){ app.innerHTML = viewRules(); bindRules(); return; }
   if(screen==='wait'){ app.innerHTML = viewWait(); bindWait(); return; }
   if(screen==='game'){
-    app.innerHTML = st.phase==='ended' ? viewResult() : viewGame();
-    st.phase==='ended' ? bindResult() : bindGame();
+    if(st.phase==='ended'){ app.innerHTML=viewResult(); bindResult(); }
+    else if(st.phase==='setup'){ app.innerHTML=viewSetup(); bindSetup(); }
+    else { app.innerHTML=viewGame(); bindGame(); }
     return;
   }
 }
@@ -616,7 +759,7 @@ function render(){
 function viewTitle(){
   return `
   <div class="subtitle serif">二 〜 四 人 ・ 星 座 争 奪 戦</div>
-  <div class="hint" style="margin-bottom:-18px;color:#4a5178">Ver.2 ─ どこでも通信対応版</div>
+  <div class="hint" style="margin-bottom:-18px;color:#4a5178">Ver.3 ─ 星占の儀・音楽対応版</div>
   <h1 class="title serif">星紡ぎ</h1>
   <div class="tagline">夜空に散らばる三十七の星。欠片を集め、星を灯し、星座の覇者となれ。<br>スマートフォン同士がインターネット越しにつながる、二〜四人の対戦ゲーム。</div>
   <div class="card">
@@ -706,6 +849,10 @@ function viewRules(){
     <h4>■ 星と星座</h4>
     盤上には色と価値(★1〜3)を持つ星が並び、いくつかの星をまとめて<b>星座</b>を成しています。
     人数によって使う星座の数が変わります(2人:6星座 / 3人:7星座 / 4人:8星座)。
+    <h4>■ 星占の儀(ゲームの始まり)</h4>
+    開始すると、まず各自が伏せられた<b>四枚の星札</b>から一枚を選び、<b>始まりの手札の枚数(1〜4枚)</b>が決まります。
+    枚数の出やすさには偏りがあり、少ない手札を引いた者は序盤を耐える戦いになります。
+    続いて親から順に星札を引き、「一番星」〜「四番星」で<b>廻り順</b>が決まります。
     <h4>■ 手番の流れ</h4>
     ① 手番の頭に<b>星運</b>が巡り(運の要素)、欠片を2枚引きます。<br>
     ② <b>行動力2</b>(星運「追い風」なら3)を使って行動します。<br>
@@ -718,6 +865,9 @@ function viewRules(){
     ・灯した星の★の合計<br>
     ・<b>完成した星座</b>ごとに、その星座で最多の星を灯した人に+8点(同数なら各+4点)<br>
     ・各自に配られる<b>秘密の目標</b>(達成で+5〜6点)。他人には見えません。
+    <h4>■ 音楽について</h4>
+    対局中はBGMが流れ、星座が完成した瞬間には全員の端末で祝福の音が鳴ります。
+    画面上部の「♪」ボタンでいつでも消音できます。
     <h4>■ 終了</h4>
     すべての星が灯るか、12巡が過ぎたら終了。得点計算に移ります。
     <h4>■ こつ</h4>
@@ -730,6 +880,59 @@ function bindRules(){
   $('#btnBack').onclick=()=>{ screen = roomCode ? (st && st.phase!=='lobby' ? 'game':'wait') : 'title'; render(); };
 }
 
+function viewSetup(){
+  const s=st, su=s.setup;
+  const cur = s.players[su.idx];
+  const mine = cur && cur.id===me.id;
+  let cards='';
+  if(su.step==='hand'){
+    cards = `<div class="scardrow">${[0,1,2,3].map(i=>
+      `<div class="scard ${mine?'tappable pulse':''}" data-pick="hand" data-i="${i}"><span class="em">星</span></div>`).join('')}</div>`;
+  }else{
+    cards = `<div class="scardrow">${su.orderCards.map((pos,i)=>{
+      const taker = su.orderPicked[i];
+      if(taker!==null){
+        return `<div class="scard revealed"><span class="big">${KNUM[pos-1]}番星</span><span class="sub">${esc(s.players[taker].name)}</span></div>`;
+      }
+      return `<div class="scard ${mine?'tappable pulse':''}" data-pick="order" data-i="${i}"><span class="em">星</span></div>`;
+    }).join('')}</div>`;
+  }
+  return `
+  <div class="topbar">
+    <div class="t serif">星占の儀</div>
+    <button class="sndbtn" id="btnSnd">${soundOn?'♪ 音あり':'♪ 消音中'}</button>
+  </div>
+  <div class="fate">${su.step==='hand'
+    ? '<b>一の儀 ── 始まりの手札</b>: 四枚の星札から一枚を選ぶ。めくった数(1〜4)が始まりの欠片の枚数となる'
+    : '<b>二の儀 ── 廻り順</b>: 親から順に星札を引く。「一番星」を引いた者が先手となる'}</div>
+  <div class="turnbanner ${mine?'mine pulse':''}">
+    ${mine ? 'あなたが星札を引く番です ── 一枚選んでタップ' : `${esc(cur.name)} が星札を選んでいます…`}
+  </div>
+  ${cards}
+  ${su.last ? `<div class="fate" style="text-align:center">◆ ${su.last}</div>` : ''}
+  <div class="card">
+    <h2>星占の結果</h2>
+    <div class="plist">
+      ${s.players.map((p,i)=>`
+        <div class="pitem ${p.id===me.id?'me':''}">
+          <span class="pmark">${markerSVG(PSTYLE[i].shape,PSTYLE[i].hex,20)}</span>
+          <span class="who">${esc(p.name)}</span>
+          <span class="tag">${p.startHand?`欠片${p.startHand}枚`:'─'}${p.order?` ／ ${KNUM[p.order-1]}番星`:''}</span>
+        </div>`).join('')}
+    </div>
+    <div class="log">${s.log.map(l=>'・'+l).join('<br>')}</div>
+  </div>`;
+}
+function bindSetup(){
+  document.querySelectorAll('[data-pick]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      if(!isMySetup()){ toast('あなたの番ではありません'); return; }
+      const i=+el.dataset.i;
+      if(el.dataset.pick==='hand') doPickHand(i); else doPickOrder(i);
+    });
+  });
+  const bs=$('#btnSnd'); if(bs) bs.onclick=toggleSound;
+}
 function viewGame(){
   const s = st;
   const cur = s.players[s.turn];
@@ -741,7 +944,8 @@ function viewGame(){
   return `
   <div class="topbar">
     <div class="t serif">星紡ぎ</div>
-    <div class="r">第${s.round}巡/全${s.maxRounds}巡 ・ 部屋 ${s.code} <span style="opacity:.5">v2</span></div>
+    <div class="r">第${s.round}巡/全${s.maxRounds}巡 ・ 部屋 ${s.code} <span style="opacity:.5">v3</span>
+      <button class="sndbtn" id="btnSnd" style="margin-left:6px">${soundOn?'♪':'✕'}</button></div>
   </div>
   <div class="fate">今宵の星運 <b>「${fd.name}」</b> ── ${fd.desc}</div>
   <div class="turnbanner ${mine?'mine pulse':''}">
@@ -831,6 +1035,7 @@ function bindGame(){
     render();
   };
   const bt=$('#btnEnd'); if(bt) bt.onclick=doEndTurn;
+  const bs=$('#btnSnd'); if(bs) bs.onclick=toggleSound;
   const br=$('#btnRules2'); if(br) br.onclick=()=>{ screen='rules'; render(); };
   const mc=$('#modalClose'); if(mc) mc.onclick=()=>{ ui.payNode=null; ui.picker=null; render(); };
   const bg=$('#modalBg'); if(bg) bg.addEventListener('click',e=>{ if(e.target===bg){ ui.payNode=null; ui.picker=null; render(); }});
@@ -894,7 +1099,7 @@ function viewResult(){
 }
 function bindResult(){
   $('#btnTitle').onclick=()=>{
-    netCleanup(); roomCode=null; st=null; screen='title';
+    netCleanup(); stopBGM(); seenCompleted=null; prevPhase=null; roomCode=null; st=null; screen='title';
     me = {id: rid(), name: me.name};
     render();
   };
