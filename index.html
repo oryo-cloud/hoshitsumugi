@@ -155,11 +155,12 @@ input[type=text]:focus{border-color:var(--gold);}
 <div id="app" class="stack"></div>
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
 <script>
 /* =====================================================
    星紡ぎ -HOSHITSUMUGI-  オリジナル通信対戦ゲーム
-   共有ストレージ(window.storage, shared=true)で
-   ルームコードによるスマホ間同期を行う。
+   PeerJS(WebRTC)によるP2P通信で、ルームコード方式の
+   スマホ間同期を行う。部屋主の端末が親機となる。
 ===================================================== */
 
 // ---------- 定数データ ----------
@@ -215,7 +216,6 @@ let roomCode = null;
 let st = null;            // 共有ゲーム状態
 let screen = 'title';     // title | join | wait | game | rules
 let ui = {payNode:null, picker:null, showObj:false, exchange:false};
-let pollTimer = null;
 let starCache = null;
 
 function rid(){ return Math.random().toString(36).slice(2,10); }
@@ -225,34 +225,64 @@ function esc(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove('show'),2300); }
 
-// ---------- 通信(共有ストレージ) ----------
+// ---------- 通信(P2P / PeerJS) ----------
+// 部屋主(親機)がサーバー役。参加者は親機に接続し、状態を中継してもらう。
+const PFX = 'hoshi26-';
+const PEER_OPTS = { debug:1, config:{ iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'},
+  {urls:'stun:stun.cloudflare.com:3478'},
+]}};
+let peer = null, hostConns = [], hostConn = null, isHost = false;
+
+function netReady(){
+  if(typeof Peer === 'undefined'){
+    toast('通信ライブラリを読み込めません。インターネット接続を確認し、ページを再読込してください');
+    return false;
+  }
+  return true;
+}
+function netCleanup(){
+  try{ if(peer) peer.destroy(); }catch(e){}
+  peer=null; hostConns=[]; hostConn=null; isHost=false;
+}
+function adoptState(s){
+  st = s;
+  if(st.phase==='playing' && screen!=='game') screen='game';
+  if(st.phase==='ended') screen='game';
+  render();
+}
 async function saveState(s){
   s.v = (s.v||0)+1;
-  try{
-    await window.storage.set(key(roomCode), JSON.stringify(s), true);
-    st = s; render();
-  }catch(e){ toast('通信に失敗しました。もう一度お試しください'); }
+  adoptState(s);
+  if(isHost) broadcast({type:'state', st:s});
+  else if(hostConn && hostConn.open) hostConn.send({type:'state', st:s});
+  else toast('接続が切れています。ページを再読込し、同じ名前で入り直してください');
 }
-async function loadState(code){
-  try{
-    const r = await window.storage.get(key(code), true);
-    return r && r.value ? JSON.parse(r.value) : null;
-  }catch(e){ return null; }
+function broadcast(msg){
+  hostConns.forEach(c=>{ if(c.open){ try{ c.send(msg); }catch(e){} } });
 }
-function startPolling(){
-  stopPolling();
-  pollTimer = setInterval(async ()=>{
-    if(!roomCode) return;
-    const s = await loadState(roomCode);
-    if(s && (!st || s.v > st.v)){
-      st = s;
-      if(st.phase==='playing' && screen!=='game') screen='game';
-      if(st.phase==='ended') screen='game';
-      render();
+function hostMsg(conn, m){
+  if(!st) return;
+  if(m.type==='join'){
+    const ex = st.players.find(p=>p.name===m.name);
+    if(ex){ // 同名 → 復帰として扱う
+      conn.send({type:'you', id:ex.id});
+      conn.send({type:'state', st});
+      return;
     }
-  }, 2000);
+    if(st.phase!=='lobby'){ conn.send({type:'err', msg:'開始済みの部屋です。中断からの復帰は同じ名前で入室してください'}); return; }
+    if(st.players.length>=st.capacity){ conn.send({type:'err', msg:'満員です'}); return; }
+    const s = JSON.parse(JSON.stringify(st));
+    let nm=m.name, k=2;
+    while(s.players.some(p=>p.name===nm)) nm=m.name+k++;
+    s.players.push({id:m.pid, name:nm, hand:[], objective:null});
+    conn.send({type:'you', id:m.pid});
+    saveState(s);
+  }else if(m.type==='state'){
+    if(m.st && m.st.v > st.v){ adoptState(m.st); broadcast({type:'state', st:m.st}); }
+  }
 }
-function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
 
 // ---------- ゲームロジック ----------
 function buildDeck(){
@@ -433,43 +463,63 @@ function genCode(){
   for(let i=0;i<4;i++) c+=cs[Math.floor(Math.random()*cs.length)];
   return c;
 }
-async function createRoom(capacity){
+function createRoom(capacity){
+  if(!netReady()) return;
   const name = ($('#nameInput')?.value||'').trim() || '名無しの星詠み';
   me.name = name;
-  roomCode = genCode();
-  const s = {
-    v:0, code:roomCode, phase:'lobby', capacity,
-    hostId: me.id,
-    players:[{id:me.id, name, hand:[], objective:null}],
-    log:[],
-  };
-  await saveState(s);
-  screen='wait'; startPolling(); render();
+  toast('部屋を用意しています…');
+  tryCreate(capacity, 0);
 }
-async function joinRoom(){
+function tryCreate(capacity, attempt){
+  if(attempt>=3){ toast('部屋を作れませんでした。通信環境を確認して再度お試しください'); return; }
+  const code = genCode();
+  netCleanup(); isHost = true;
+  peer = new Peer(PFX+code, PEER_OPTS);
+  let opened = false;
+  peer.on('open', ()=>{
+    opened = true; roomCode = code;
+    st = { v:1, code, phase:'lobby', capacity, hostId: me.id,
+      players:[{id:me.id, name:me.name, hand:[], objective:null}], log:[] };
+    screen='wait'; render();
+  });
+  peer.on('connection', conn=>{
+    hostConns.push(conn);
+    conn.on('data', m=>hostMsg(conn, m));
+    conn.on('close', ()=>{ hostConns = hostConns.filter(c=>c!==conn); });
+  });
+  peer.on('error', err=>{
+    if(err.type==='unavailable-id' && !opened) tryCreate(capacity, attempt+1);
+    else if(!opened) toast('通信サーバーに接続できません: '+err.type);
+  });
+}
+function joinRoom(){
+  if(!netReady()) return;
   const code = ($('#codeInput')?.value||'').trim().toUpperCase();
   const name = ($('#nameInput2')?.value||'').trim() || '名無しの星詠み';
-  if(code.length!==4){ toast('4文字のコードを入力してください'); return; }
-  const s = await loadState(code);
-  if(!s){ toast('その部屋は見つかりません'); return; }
-  roomCode = code; me.name = name;
-  // 復帰: 同名プレイヤーがいれば引き継ぎ
-  const existing = s.players.find(p=>p.name===name);
-  if(existing){
-    me.id = existing.id;
-    st = s; screen = s.phase==='lobby' ? 'wait' : 'game';
-    startPolling(); render();
-    toast('この名前で復帰しました');
-    return;
-  }
-  if(s.phase!=='lobby'){ toast('この部屋はすでに開始しています(同じ名前なら復帰できます)'); return; }
-  if(s.players.length >= s.capacity){ toast('満員です'); return; }
-  let nm = name, k=2;
-  while(s.players.some(p=>p.name===nm)) nm = name+k++;
-  me.name = nm;
-  s.players.push({id:me.id, name:nm, hand:[], objective:null});
-  await saveState(s);
-  screen='wait'; startPolling(); render();
+  if(code.length!==4){ toast('4文字の合言葉を入力してください'); return; }
+  me.name = name;
+  netCleanup(); isHost = false;
+  toast('部屋を探しています…');
+  peer = new Peer(PEER_OPTS);
+  peer.on('open', ()=>{
+    hostConn = peer.connect(PFX+code, {reliable:true});
+    hostConn.on('open', ()=>{ roomCode = code; hostConn.send({type:'join', name, pid: me.id}); });
+    hostConn.on('data', m=>{
+      if(m.type==='you'){ me.id = m.id; }
+      else if(m.type==='state'){
+        if(!st || m.st.v > st.v || st.code !== m.st.code){
+          if(screen==='join' || screen==='title') screen = (m.st.phase==='lobby') ? 'wait' : 'game';
+          adoptState(m.st);
+        }
+      }
+      else if(m.type==='err'){ toast(m.msg); }
+    });
+    hostConn.on('close', ()=>{ if(roomCode && st && st.phase!=='ended') toast('部屋主との接続が切れました。部屋主が画面を開いているか確認してください'); });
+  });
+  peer.on('error', err=>{
+    if(err.type==='peer-unavailable') toast('その部屋は見つかりません。部屋主が待合の間を開いたままか確認してください');
+    else toast('通信エラー: '+err.type);
+  });
 }
 async function hostStart(){
   const s = JSON.parse(JSON.stringify(st));
@@ -566,8 +616,9 @@ function render(){
 function viewTitle(){
   return `
   <div class="subtitle serif">二 〜 四 人 ・ 星 座 争 奪 戦</div>
+  <div class="hint" style="margin-bottom:-18px;color:#4a5178">Ver.2 ─ どこでも通信対応版</div>
   <h1 class="title serif">星紡ぎ</h1>
-  <div class="tagline">夜空に散らばる三十七の星。<br>欠片を集め、星を灯し、星座の覇者となれ。</div>
+  <div class="tagline">夜空に散らばる三十七の星。欠片を集め、星を灯し、星座の覇者となれ。<br>スマートフォン同士がインターネット越しにつながる、二〜四人の対戦ゲーム。</div>
   <div class="card">
     <h2>部屋を作る</h2>
     <label class="f">あなたの名前</label>
@@ -621,7 +672,8 @@ function viewWait(){
   <div class="card center">
     <h2>合言葉</h2>
     <div class="code-big serif">${st.code}</div>
-    <div class="hint">同じアプリを開いた仲間に、この4文字を伝えてください。<br>「部屋に入る」から入室できます。</div>
+    ${st.hostId===me.id?`<div class="hint" style="color:#7fd8a4">● 通信サーバーに接続済み ── 参加を受け付けています</div>`:''}
+    <div class="hint">このページと<b>同じURL</b>を開いた仲間に、この4文字を伝えてください。<br>「部屋に入る」から入室できます。</div>
   </div>
   <div class="card">
     <h2>集った星詠み(${st.players.length} / ${st.capacity})</h2>
@@ -636,7 +688,7 @@ function viewWait(){
     ${isHost
       ? `<button class="btn gold" id="btnStart" ${st.players.length<2?'disabled':''}>
            ${full?'全員そろった — 開始する':`この${st.players.length}人で開始する`}</button>
-         <div class="hint" style="margin-top:8px">2人なら約40分、4人なら約90分の星巡りです</div>`
+         <div class="hint" style="margin-top:8px">2人なら約40分、4人なら約90分の星巡りです。<br><b>あなたの端末が親機です。</b>対局中はこの画面を閉じないでください</div>`
       : `<div class="hint">部屋主の開始を待っています…</div>`}
   </div>
   <div class="center"><button class="linklike" id="btnRules">▶ 待っている間に遊び方を読む</button></div>`;
@@ -689,7 +741,7 @@ function viewGame(){
   return `
   <div class="topbar">
     <div class="t serif">星紡ぎ</div>
-    <div class="r">第${s.round}巡 / 全${s.maxRounds}巡 &nbsp; 部屋 ${s.code}</div>
+    <div class="r">第${s.round}巡/全${s.maxRounds}巡 ・ 部屋 ${s.code} <span style="opacity:.5">v2</span></div>
   </div>
   <div class="fate">今宵の星運 <b>「${fd.name}」</b> ── ${fd.desc}</div>
   <div class="turnbanner ${mine?'mine pulse':''}">
@@ -837,12 +889,12 @@ function viewResult(){
       </div>`;}).join('')}
   </div>
   <div class="boardwrap">${boardSVG()}</div>
-  <div class="hint" style="margin:12px 0">もう一局は、部屋主が新しい部屋を作って合言葉を共有してください。</div>
+  <div class="hint" style="margin:12px 0">もう一局は、部屋主が「最初の画面へ」から新しい部屋を作り、合言葉を共有してください。</div>
   <button class="btn" id="btnTitle">最初の画面へ</button>`;
 }
 function bindResult(){
   $('#btnTitle').onclick=()=>{
-    stopPolling(); roomCode=null; st=null; screen='title';
+    netCleanup(); roomCode=null; st=null; screen='title';
     me = {id: rid(), name: me.name};
     render();
   };
